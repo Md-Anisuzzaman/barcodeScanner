@@ -45,7 +45,7 @@
 //           config,
 //           (decodedText) => {
 //             dispatch(setScannedData(decodedText));
-//             stopScanner(); 
+//             stopScanner();
 //           },
 //           (errorMessage) => {
 //            console.log(errorMessage);
@@ -70,7 +70,7 @@
 //       >
 //         {isCameraOpen ? (
 //           <>
-           
+
 //             <div id="reader" className="w-full h-full"></div>
 
 //             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
@@ -148,74 +148,63 @@
 // };
 
 // export default BarcodeScanner;
-import { useState } from "react";
-import { useSelector } from "react-redux";
+
+
+import { useState} from "react";
 import { useLazyGetProductByBarcodeQuery } from "../store/productApiSlice";
-import ScannerView from "./ScannerView";
-import ProductListView from "./ProductListView";
+import ScannerView from "./ScannerView"; // স্ক্যানার পার্ট
+import ProductCard from "./ProductCard"; // প্রোডাক্ট কার্ড
+import SearchBar from "./SearchBar"; // সার্চবার পার্ট
 
 const BarcodeScanner = () => {
-  const { isCameraOpen } = useSelector((state) => state.scanner);
-  const [products, setProducts] = useState([]);
-  const [trigger, { isFetching }] = useLazyGetProductByBarcodeQuery();
+  const [product, setProduct] = useState(null);
+  const [trigger, { isFetching, isError, error }] = useLazyGetProductByBarcodeQuery();
 
-  // প্রোডাক্ট ফেচ লজিক
-  const handleProductFetch = async (barcode) => {
+  // বারকোড পাওয়ার পর এপিআই কল করার মেইন ফাংশন
+  const handleBarcodeSearch = async (barcode) => {
+    if (!barcode) return;
     try {
-      const { data: product } = await trigger(barcode);
-      if (product) {
-        setProducts((prev) => {
-          const exists = prev.find((p) => p.barcode === barcode);
-          if (exists) {
-            return prev.map((p) =>
-              p.barcode === barcode ? { ...p, qty: p.qty + 1 } : p
-            );
-          }
-          return [
-            {
-              id: product.id || Date.now(),
-              name: product.name,
-              price: parseFloat(product.price),
-              image: product.image_url || "https://via.placeholder.com/100",
-              barcode: barcode,
-              qty: 1,
-            },
-            ...prev,
-          ];
-        });
-      }
+      const result = await trigger(barcode).unwrap();
+      setProduct(result);
     } catch (err) {
-      console.error("API Error:", err);
+      setProduct(null);
+      console.error("Search failed:", err);
     }
   };
 
-  const updateQuantity = (id, delta) => {
-    setProducts((prev) =>
-      prev.map((p) =>
-        p.id === id ? { ...p, qty: Math.max(1, p.qty + delta) } : p
-      )
-    );
-  };
-
-  const removeProduct = (id) => {
-    setProducts((prev) => prev.filter((p) => p.id !== id));
-  };
-
   return (
-    <div className="flex flex-col items-center p-4 min-h-screen bg-gray-100 pb-28">
-      {/* কম্পোনেন্ট ১: স্ক্যানার ভিউ */}
-      <ScannerView 
-        isCameraOpen={isCameraOpen} 
-        isFetching={isFetching} 
-        onScanSuccess={handleProductFetch} 
-      />
+    <div className="flex flex-col items-center p-4 min-h-screen bg-gray-50 pb-20">
+      <div className="w-full max-w-md space-y-6">
+        
+        {/* ১. স্ক্যানার কম্পোনেন্ট (আপনার ডিজাইন) */}
+        <ScannerView onScanSuccess={handleBarcodeSearch} isFetching={isFetching} />
 
-      {/* কম্পোনেন্ট ২: রেজাল্ট এবং লিস্ট ভিউ */}
-      <ProductListView 
-        products={products} 
-        updateQuantity={updateQuantity} 
-        removeProduct={removeProduct} 
-      />
+        {/* ২. সার্চবার কম্পোনেন্ট */}
+        <SearchBar onSearch={handleBarcodeSearch} isLoading={isFetching} />
+
+        {/* ৩. রেজাল্ট সেকশন / প্রোডাক্ট কার্ড */}
+        <div className="mt-4">
+          {isFetching && (
+            <div className="flex justify-center p-10">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+            </div>
+          )}
+
+          {isError && (
+            <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm border border-red-100">
+              {error?.data?.message || "Product not found!"}
+            </div>
+          )}
+
+          {product && !isFetching && <ProductCard product={product} />}
+          
+          {!product && !isFetching && !isError && (
+            <div className="text-center text-zinc-400 py-10 border-2 border-dashed border-zinc-200 rounded-2xl">
+              <p className="text-sm italic">Scan a barcode or type to see product details</p>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

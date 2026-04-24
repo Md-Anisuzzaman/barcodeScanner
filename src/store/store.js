@@ -6,6 +6,8 @@ export const store = configureStore({
   reducer: {
     scanner: scannerReducer,
     [productApi.reducerPath]: productApi.reducer,
-
   },
+
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware().concat(productApi.middleware),
 });
