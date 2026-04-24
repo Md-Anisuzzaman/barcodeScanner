@@ -1,27 +1,68 @@
+import { useEffect, useRef, useCallback } from "react";
 import { useSelector, useDispatch } from "react-redux";
-import BarcodeScannerComponent from "react-qr-barcode-scanner";
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { setScannedData, toggleCamera } from "../store/scannerSlice";
 
 const BarcodeScanner = () => {
   const dispatch = useDispatch();
   const { scannedData, isCameraOpen } = useSelector((state) => state.scanner);
+  const qrCodeRef = useRef(null);
 
-  const handleScan = (err, result) => {
-    if (result) {
-      dispatch(setScannedData(result.text));
-      dispatch(toggleCamera(false));
-    } else if (err) {
-      console.log(err);
-
-      if (err.name === "NotAllowedError") {
-        console.error("User denied camera access");
-      } else if (err.name === "NotFoundError") {
-        console.error("No camera device found");
-      } else {
-        console.error("Scanner Error:", err);
-      }
+  // স্ক্যানার বন্ধ করার জন্য useCallback ব্যবহার করা হয়েছে যাতে ডিপেন্ডেন্সি এরর না আসে
+  const stopScanner = useCallback(() => {
+    if (qrCodeRef.current && qrCodeRef.current.isScanning) {
+      qrCodeRef.current
+        .stop()
+        .then(() => {
+          dispatch(toggleCamera(false));
+        })
+        .catch((err) => console.error("Failed to stop scanner", err));
     }
-  };
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (isCameraOpen) {
+      const html5QrCode = new Html5Qrcode("reader");
+      qrCodeRef.current = html5QrCode;
+
+      const config = {
+        fps: 20, // স্ক্যানিং স্পিড
+        qrbox: { width: 250, height: 200 }, // স্ক্যানিং এরিয়া
+        aspectRatio: 1.0,
+        // প্রায় সব ধরণের বারকোড সাপোর্ট নিশ্চিত করা হয়েছে
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.QR_CODE,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+        ],
+      };
+
+      html5QrCode
+        .start(
+          { facingMode: "environment" },
+          config,
+          (decodedText) => {
+            dispatch(setScannedData(decodedText));
+            stopScanner(); 
+          },
+          (errorMessage) => {
+           console.log(errorMessage);
+           
+          }
+        )
+        .catch((err) => console.error("Unable to start scanner", err));
+    }
+
+    // ক্লিনআপ ফাংশন
+    return () => {
+      if (qrCodeRef.current && qrCodeRef.current.isScanning) {
+        qrCodeRef.current.stop().catch((err) => console.log(err));
+      }
+    };
+  }, [isCameraOpen, stopScanner,dispatch]);
 
   return (
     <div className="flex flex-col items-center p-4 min-h-screen bg-gray-100">
@@ -32,14 +73,11 @@ const BarcodeScanner = () => {
       >
         {isCameraOpen ? (
           <>
-            <BarcodeScannerComponent
-              width="100%"
-              height="100%"
-              onUpdate={handleScan}
-            />
+            {/* html5-qrcode ভিডিও রেন্ডার করার জন্য এই আইডিটি দরকার */}
+            <div id="reader" className="w-full h-full"></div>
 
-            {/* --- Rectangular Overlay Design --- */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            {/* --- Rectangular Overlay Design (আপনার দেওয়া ডিজাইন) --- */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
               {/* মেইন ফ্রেম */}
               <div className="relative w-64 h-52 border-2 border-white/30 rounded-lg">
                 {/* corner border */}
@@ -48,16 +86,16 @@ const BarcodeScanner = () => {
                 <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-indigo-500 -ml-1 -mb-1 rounded-bl-sm"></div>
                 <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-indigo-500 -mr-1 -mb-1 rounded-br-sm"></div>
 
-                {/* scanning animation  */}
+             {/* scanning animation */}
                 <div className="w-full h-0.5 bg-indigo-500 absolute top-0 animate-scan shadow-[0_0_15px_rgba(99,102,241,0.8)]"></div>
               </div>
 
-              {/* outside part of border (Optional) */}
+              {/* outside part of border */}
               <div className="absolute inset-0 bg-black/20"></div>
             </div>
 
             {/* Instruction Text */}
-            <div className="absolute bottom-4 left-0 right-0 text-center">
+            <div className="absolute bottom-4 left-0 right-0 text-center z-20">
               <span className="bg-black/60 text-white text-[10px] px-3 py-1 rounded-full uppercase tracking-widest font-bold">
                 Align barcode within frame
               </span>
@@ -66,24 +104,9 @@ const BarcodeScanner = () => {
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-zinc-500 gap-3">
             <div className="w-16 h-16 rounded-full bg-zinc-800 flex items-center justify-center">
-              <svg
-                className="w-8 h-8"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-                ></path>
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
-                ></path>
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </div>
             <p className="text-sm font-medium">Camera is Off</p>
@@ -95,7 +118,8 @@ const BarcodeScanner = () => {
       <div className="flex gap-4 my-8 w-full max-w-md">
         <button
           onClick={() => dispatch(toggleCamera(true))}
-          className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-indigo-200 transition-all active:scale-95"
+          disabled={isCameraOpen}
+          className={`flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-indigo-200 transition-all active:scale-95 ${isCameraOpen ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
           {isCameraOpen ? "Camera Active" : "Open Camera"}
         </button>
@@ -112,7 +136,7 @@ const BarcodeScanner = () => {
         {scannedData ? (
           <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
             <p className="text-indigo-900 font-mono break-all text-sm">
-              <span className="font-bold text-indigo-400 mr-2">DATA:</span>{" "}
+              <span className="font-bold text-indigo-400 mr-2">DATA:</span>
               {scannedData}
             </p>
           </div>
