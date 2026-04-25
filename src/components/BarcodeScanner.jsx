@@ -3,13 +3,16 @@ import { useSelector, useDispatch } from "react-redux";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { setScannedData, toggleCamera } from "../store/scannerSlice";
 import { useLazyGetProductByBarcodeQuery } from "../store/productApiSlice";
+import ProductsComp from "./ProductsComp";
+
 
 const BarcodeScanner = () => {
-  const [trigger, { data, isFetching, isError, error }] =
+  const [trigger, { data, error, isFetching, isError }] =
     useLazyGetProductByBarcodeQuery();
   const dispatch = useDispatch();
   const { scannedData, isCameraOpen } = useSelector((state) => state.scanner);
   const qrCodeRef = useRef(null);
+  const isProcessingRef = useRef(false);
 
   // স্ক্যানার বন্ধ করার জন্য useCallback ব্যবহার করা হয়েছে যাতে ডিপেন্ডেন্সি এরর না আসে
   const stopScanner = useCallback(() => {
@@ -43,26 +46,16 @@ const BarcodeScanner = () => {
       };
 
       html5QrCode
-        .start(
-          { facingMode: "environment" },
-          config,
-          async (decodedText) => {
-            // added async
-            dispatch(setScannedData(decodedText));
-            console.log("Scanned Barcode:", decodedText);
-            try {
-              // .unwrap() allows you to treat the result like a standard promise
-              const result = await trigger(decodedText).unwrap();
-              console.log("🔍 Scanned Result from API:", result);
-            } catch (err) {
-              console.error("🔍 Product not found in database:", err);
-            }
-            stopScanner();
-          },
-          (errorMessage) => {
-            console.log(errorMessage);
-          },
-        )
+        .start({ facingMode: "environment" }, config, (decodedText) => {
+          if (isProcessingRef.current) return;
+
+          isProcessingRef.current = true;
+
+          dispatch(setScannedData(decodedText));
+          console.log("Scanned Barcode:", decodedText);
+
+          trigger(decodedText);
+        })
         .catch((err) => console.error("Unable to start scanner", err));
     }
 
@@ -74,13 +67,10 @@ const BarcodeScanner = () => {
   }, [isCameraOpen, stopScanner, dispatch, trigger]);
 
   useEffect(() => {
-    if (data) {
-      console.log("✅ Product Found:", data);
+    if (data || isError) {
+      isProcessingRef.current = false;
     }
-    if (error) {
-      console.error("❌ API Error:", error);
-    }
-  }, [data, error]);
+  }, [data, isError]);
 
   return (
     <div className="flex flex-col items-center p-4 min-h-screen bg-gray-100">
@@ -179,51 +169,25 @@ const BarcodeScanner = () => {
         )}
       </div> */}
 
-      {/* Result Section */}
-      <div className="w-full max-w-md bg-white p-6 rounded-2xl shadow-xl border border-zinc-100">
-        <h3 className="text-sm font-black uppercase tracking-wider text-zinc-400 mb-4">
-          Product Information
-          <div>
-            {data}
-          </div>
-        </h3>
+      <p>{scannedData}</p>
+      {isFetching && <p className="text-blue-500">Loading product...</p>}
 
-        {/* 1. Loading State */}
-        {isFetching && (
-          <div className="flex items-center justify-center p-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-            <p className="ml-3 text-sm text-zinc-500">Searching product...</p>
-          </div>
-        )}
+      {isError && (
+        <p className="text-red-500">
+          Error: {error?.data?.message || "Something went wrong"}
+        </p>
+      )}
 
-        {/* 2. Error State */}
-        {isError && (
-          <div className="bg-red-50 p-4 rounded-xl border border-red-100 mb-4">
-            <p className="text-red-600 text-sm">
-              {error?.data?.message || "Product not found or network error."}
-            </p>
-          </div>
-        )}
-
-        {/* 3. Success State (Assuming 'data' is returned from trigger) */}
-        {scannedData && !isFetching && !isError && (
-          <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
-            <p className="text-xs text-indigo-400 font-bold mb-1">
-              BARCODE: {scannedData}
-            </p>
-            {/* If your API returns data, display it here */}
-            {/* <p className="text-lg font-bold text-indigo-900">{data?.name}</p> */}
-            {/* <p className="text-indigo-700">${data?.price}</p> */}
-          </div>
-        )}
-
-        {!scannedData && !isFetching && (
-          <div className="flex items-center gap-3 text-zinc-400">
-            <div className="w-2 h-2 rounded-full bg-zinc-200 animate-pulse"></div>
-            <p className="text-sm italic">Waiting for scan...</p>
-          </div>
-        )}
-      </div>
+      {data && (
+        <div className="mt-4 p-4 bg-green-50 rounded-xl border">
+          <h4 className="font-bold text-green-700">Product Found:</h4>
+          <p>Name: {data?.name}</p>
+          <p>Price: {data?.price}</p>
+          <p>Barcode: {data?.barcode}</p>
+        </div>
+      )}
+      <ProductsComp />
+      
     </div>
   );
 };
