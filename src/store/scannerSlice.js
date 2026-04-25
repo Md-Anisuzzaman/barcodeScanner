@@ -8,6 +8,7 @@ const scannerSlice = createSlice({
   },
   reducers: {
     setScannedData: (state, action) => {
+      console.log(state.scannedData, action.payload);
       state.scannedData = action.payload;
     },
     toggleCamera: (state, action) => {

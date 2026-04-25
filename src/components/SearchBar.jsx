@@ -31,3 +31,5 @@ const SearchBar = ({ onSearch, isLoading }) => {
 };
 
 export default SearchBar;
+
+

@@ -106,3 +106,4 @@ const ScannerView = ({ onScanSuccess }) => {
 };
 
 export default ScannerView;
+
