@@ -264,7 +264,7 @@ import { setScannedData, toggleCamera } from "../store/scannerSlice";
 import { addItemFromScanner, clearScanError } from "../store/cartSlice";
 import { useLazyGetProductByBarcodeQuery } from "../store/productApiSlice";
 import Products from "./Products";
-import ScanErrorToast from "./ScanErrorToast";
+// import ScanErrorToast from "./ScanErrorToast";
 
 const BarcodeScanner = () => {
   const [trigger, { isFetching, isError, error }] =
@@ -335,7 +335,7 @@ const BarcodeScanner = () => {
 
   return (
     <div className="flex flex-col items-center p-4 min-h-screen bg-gray-100">
-      <ScanErrorToast />
+      {/* <ScanErrorToast /> */}
       <div
         className="w-full max-w-md bg-black rounded-2xl overflow-hidden relative shadow-2xl"
         style={{ height: "350px" }}
@@ -388,15 +388,6 @@ const BarcodeScanner = () => {
           Customer
         </button>
       </div>
-
-      {/* {scanError && (
-        <div className="fixed top-10 left-1/2 -translate-x-1/2 z-50 animate-bounce">
-          <div className="bg-orange-500 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-2 border-2 border-white whitespace-nowrap">
-            <span className="font-bold">⚠️ {scanError}</span>
-          </div>
-        </div>
-      )} */}
-
       {isFetching && (
         <p className="text-blue-500 font-bold">Checking database...</p>
       )}
