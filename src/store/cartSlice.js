@@ -19,7 +19,7 @@ const cartSlice = createSlice({
         state.scanError = null;
       } else {
         console.log("Product already in cart. Scan ignored.");
-        state.scanError = `"${newProduct.name}" is already in the cart!`;
+        state.scanError = `${newProduct.name} is already in the cart!`;
       }
     },
     updateQuantity: (state, action) => {
